@@ -18,7 +18,7 @@
 
 ## 🏗️ Architecture
 
-![System Architecture](docs/images/system-overview.png)
+![System Architecture](docs/images/architecture-diagram.png)
 
 The system consists of:
 - **Chat Backend**: WebSocket-based chat server with Prometheus metrics
