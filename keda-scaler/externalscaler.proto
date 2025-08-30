@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package externalscaler;
+
+service ExternalScaler {
+  rpc IsActive(ScaledObjectRef) returns (IsActiveResponse) {}
+  rpc StreamIsActive(ScaledObjectRef) returns (stream IsActiveResponse) {}
+  rpc GetMetricSpec(ScaledObjectRef) returns (GetMetricSpecResponse) {}
+  rpc GetMetrics(GetMetricsRequest) returns (GetMetricsResponse) {}
+  rpc StreamGetMetrics(GetMetricsRequest) returns (stream GetMetricsResponse) {}
+}
+
+message ScaledObjectRef {
+  string name = 1;
+  string namespace = 2;
+  map<string, string> scalerMetadata = 3;
+}
+
+message IsActiveResponse {
+  bool result = 1;
+}
+
+message GetMetricSpecResponse {
+  repeated MetricSpec metric_specs = 1;
+}
+
+message MetricSpec {
+  string metric_name = 1;
+  int64 target_size = 2;
+}
+
+message GetMetricsRequest {
+  ScaledObjectRef scaled_object_ref = 1;
+  string metric_name = 2;
+}
+
+message GetMetricsResponse {
+  repeated MetricValue metrics = 1;
+}
+
+message MetricValue {
+  string metric_name = 1;
+  int64 metric_value = 2;
+}

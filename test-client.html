@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Test Client</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        #messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            background: #fafafa;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 5px;
+            background: white;
+        }
+        .message.own {
+            background: #007bff;
+            color: white;
+            margin-left: 20%;
+        }
+        .message.system {
+            background: #6c757d;
+            color: white;
+            text-align: center;
+            font-size: 0.9em;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .stats {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 5px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chat Test Client</h1>
+        
+        <div id="status" class="status disconnected">Disconnected</div>
+        
+        <div id="messages"></div>
+        
+        <div class="input-group">
+            <input type="text" id="messageInput" placeholder="Type a message..." disabled>
+            <button id="sendButton" disabled>Send</button>
+            <button id="connectButton">Connect</button>
+        </div>
+        
+        <div class="stats">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="messageCount">0</div>
+                    <div class="stat-label">Messages Sent</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="connectionTime">0s</div>
+                    <div class="stat-label">Connected Time</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="messageRate">0</div>
+                    <div class="stat-label">Msg/Min</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let connected = false;
+        let messageCount = 0;
+        let connectionStartTime = null;
+        let clientId = `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const connectButton = document.getElementById('connectButton');
+        const messageCountSpan = document.getElementById('messageCount');
+        const connectionTimeSpan = document.getElementById('connectionTime');
+        const messageRateSpan = document.getElementById('messageRate');
+        
+        function updateStats() {
+            messageCountSpan.textContent = messageCount;
+            
+            if (connectionStartTime) {
+                const elapsed = Math.floor((Date.now() - connectionStartTime) / 1000);
+                connectionTimeSpan.textContent = `${elapsed}s`;
+                
+                const minutes = elapsed / 60;
+                const rate = minutes > 0 ? Math.round(messageCount / minutes) : 0;
+                messageRateSpan.textContent = rate;
+            }
+        }
+        
+        setInterval(updateStats, 1000);
+        
+        function addMessage(text, className = '') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${className}`;
+            messageDiv.textContent = text;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function connect() {
+            const host = window.location.hostname || 'localhost';
+            const port = 8000;
+            ws = new WebSocket(`ws://${host}:${port}/ws/${clientId}`);
+            
+            ws.onopen = () => {
+                connected = true;
+                connectionStartTime = Date.now();
+                statusDiv.textContent = `Connected as ${clientId}`;
+                statusDiv.className = 'status connected';
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                connectButton.textContent = 'Disconnect';
+                addMessage('Connected to chat server', 'system');
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type !== 'pong') {
+                        addMessage(`${data.sender}: ${data.message}`);
+                    }
+                } catch {
+                    addMessage(event.data);
+                }
+            };
+            
+            ws.onclose = () => {
+                disconnect();
+                addMessage('Disconnected from server', 'system');
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                addMessage('Connection error', 'system');
+            };
+            
+            // Send ping every 30 seconds to keep connection alive
+            setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                }
+            }, 30000);
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            connected = false;
+            statusDiv.textContent = 'Disconnected';
+            statusDiv.className = 'status disconnected';
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+            connectButton.textContent = 'Connect';
+            connectionStartTime = null;
+        }
+        
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ message: message }));
+                addMessage(`You: ${message}`, 'own');
+                messageCount++;
+                messageInput.value = '';
+                updateStats();
+            }
+        }
+        
+        connectButton.addEventListener('click', () => {
+            if (connected) {
+                disconnect();
+            } else {
+                connect();
+            }
+        });
+        
+        sendButton.addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

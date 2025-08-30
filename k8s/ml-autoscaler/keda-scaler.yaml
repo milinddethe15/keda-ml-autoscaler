@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: keda-external-scaler
+  namespace: ml-autoscaler
+spec:
+  selector:
+    app: keda-external-scaler
+  ports:
+    - name: grpc
+      port: 6000
+      targetPort: 6000
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keda-external-scaler
+  namespace: ml-autoscaler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keda-external-scaler
+  template:
+    metadata:
+      labels:
+        app: keda-external-scaler
+    spec:
+      containers:
+      - name: scaler
+        image: keda-scaler:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 6000
+        env:
+        - name: FORECASTER_URL
+          value: "http://forecaster:8001"
+        - name: METRIC_NAME
+          value: "chat_messages_per_second"
+        - name: FORECAST_MINUTES
+          value: "5"
+        - name: TARGET_VALUE
+          value: "5"
+        - name: MIN_REPLICAS
+          value: "2"
+        - name: MAX_REPLICAS
+          value: "20"
+        - name: GRPC_PORT
+          value: "6000"
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "250m"
+          requests:
+            memory: "128Mi"
+            cpu: "100m"

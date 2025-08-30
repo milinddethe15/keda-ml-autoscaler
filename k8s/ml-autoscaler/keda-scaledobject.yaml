@@ -1,0 +1,41 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: chat-backend-scaler
+  namespace: ml-autoscaler
+spec:
+  scaleTargetRef:
+    name: chat-backend
+  minReplicaCount: 2
+  maxReplicaCount: 20
+  pollingInterval: 10
+  cooldownPeriod: 30
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 15
+          policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+          - type: Pods
+            value: 4
+            periodSeconds: 15
+          selectPolicy: Max
+        scaleDown:
+          stabilizationWindowSeconds: 30
+          policies:
+          - type: Percent
+            value: 50
+            periodSeconds: 30
+          - type: Pods
+            value: 2
+            periodSeconds: 30
+          selectPolicy: Min
+  triggers:
+  - type: external
+    metadata:
+      scalerAddress: keda-external-scaler.ml-autoscaler.svc.cluster.local:6000
+      metricName: predicted_load
+      targetValue: "5"
